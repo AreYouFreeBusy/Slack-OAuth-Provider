@@ -124,9 +124,20 @@ namespace Owin.Security.Providers.Slack
                 if (!string.IsNullOrEmpty(context.UserName)) 
                 {
                     context.Identity.AddClaim(
-                        new Claim(ClaimTypes.Name, context.UserName, XmlSchemaString, Options.AuthenticationType));
+                        new Claim(ClaimsIdentity.DefaultNameClaimType, context.UserName, XmlSchemaString, Options.AuthenticationType));
                 }
-
+                if (!string.IsNullOrEmpty(context.TeamId)) 
+                {
+                    context.Identity.AddClaim(new Claim("urn:slack:teamid", context.TeamId, XmlSchemaString, Options.AuthenticationType));
+                }
+                if (!string.IsNullOrEmpty(context.TeamName)) 
+                {
+                    context.Identity.AddClaim(new Claim("urn:slack:teamname", context.TeamName, XmlSchemaString, Options.AuthenticationType));
+                }
+                if (!string.IsNullOrEmpty(context.TeamUrl)) 
+                {
+                    context.Identity.AddClaim(new Claim(ClaimTypes.Webpage, context.TeamUrl, XmlSchemaString, Options.AuthenticationType));
+                }
                 context.Properties = properties;
 
                 await Options.Provider.Authenticated(context);

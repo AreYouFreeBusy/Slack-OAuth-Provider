@@ -20,7 +20,7 @@ namespace Owin.Security.Providers.Slack
         /// </summary>
         /// <param name="context">The OWIN environment</param>
         /// <param name="user">The JSON-serialized user</param>
-        /// <param name="accessToken">Azure AD Access token</param>
+        /// <param name="accessToken">Slack access token</param>
         public SlackAuthenticatedContext(
             IOwinContext context, string accessToken, JObject user, JObject bot, JObject incomingWebhook) 
             : base(context)
@@ -33,6 +33,7 @@ namespace Owin.Security.Providers.Slack
                 TeamName = TryGetValue(user, "team");
                 UserId = TryGetValue(user, "user_id");
                 UserName = TryGetValue(user, "user");
+                TeamUrl = TryGetValue(user, "url");
             }
 
             if (bot != null) 
@@ -65,6 +66,11 @@ namespace Owin.Security.Providers.Slack
         public string TeamName { get; private set; }
 
         /// <summary>
+        /// Gets the team URL
+        /// </summary>
+        public string TeamUrl { get; private set; }
+
+        /// <summary>
         /// Gets the user ID
         /// </summary>
         public string UserId { get; private set; }
@@ -75,14 +81,40 @@ namespace Owin.Security.Providers.Slack
         public string UserName { get; private set; }
 
         /// <summary>
+        /// Gets the fully qualified user ID
+        /// </summary>
+        public string UserSub 
+        {
+            get 
+            {
+                // per guidance from Slack team as discussed in dev4slack team 
+                // the user's identity should be fully qualified with the team identity
+                return String.Format("{0}_{1}", TeamId, UserId);
+            }
+        }
+
+        /// <summary>
         /// If requesting access for a bot gets the user ID for the bot user
         /// </summary>
         public string BotUserId { get; private set; }
 
         /// <summary>
+        /// Gets the fully qualified bot user ID
+        /// </summary>
+        public string BotUserSub {
+            get 
+            {
+                // per guidance from Slack team as discussed in dev4slack team 
+                // the user's identity should be fully qualified with the team identity
+                return !String.IsNullOrEmpty(BotUserId) ? String.Format("{0}_{1}", TeamId, BotUserId) : null;
+            }
+        }
+
+        /// <summary>
         /// If requesting access for a bot gets the access token to be used by the bot
         /// </summary>
         public string BotAccessToken { get; private set; }
+
 
         /// <summary>
         /// Gets the username
