@@ -2,7 +2,7 @@
 <package>
   <metadata>
     <id>Owin.Security.Providers.Slack</id>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <title>Owin.Security.Providers.Slack</title>
     <authors>Stefan Negritoiu (FreeBusy)</authors>
     <owners>Stefan Negritoiu (FreeBusy)</owners>
@@ -13,7 +13,8 @@
       Slack OAuth provider for OWIN to use with ASP.NET 4.5
     </description>
     <releaseNotes>
-      Introducing Slack OAuth provider for OWIN to use with ASP.NET 4.5
+1.0: Introducing Slack OAuth provider for OWIN to use with ASP.NET 4.5
+1.1: Exposing claims for TeamId and TeamName
     </releaseNotes>
     <copyright>Copyright 2015 Stefan Negritoiu</copyright>
     <tags>owin katana oauth asp.net slack</tags>
