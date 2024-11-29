@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -17,7 +18,7 @@ namespace Owin.Security.Providers.Slack
 {
     public class SlackAuthenticationHandler : AuthenticationHandler<SlackAuthenticationOptions>
     {
-        // see https://api.slack.com/docs/oauth for docs 
+        // see https://api.slack.com/authentication/oauth-v2 for docs 
         private const string AuthorizeEndpoint = "https://slack.com/oauth/v2/authorize";
         private const string TokenEndpoint = "https://slack.com/api/oauth.v2.access";
         private const string UserInfoEndpoint = "https://slack.com/api/users.info";
@@ -191,10 +192,11 @@ namespace Owin.Security.Providers.Slack
                 queryStrings.Add("client_id", Options.ClientId);
                 queryStrings.Add("redirect_uri", redirectUri);
 
-                // default scope
-                if (Options.Scope.IndexOf("identify") < 0) 
+                // default scope, docs at https://api.slack.com/scopes
+                if (!Options.Scope.Any()) 
                 {
-                    Options.Scope.Add("identify");
+                    Options.Scope.Add("email");
+                    Options.Scope.Add("profile");
                 }
                 AddQueryString(queryStrings, properties, "scope", string.Join(" ", Options.Scope));
 
