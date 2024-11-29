@@ -3,14 +3,12 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.Owin;
 using Microsoft.Owin.Infrastructure;
 using Microsoft.Owin.Logging;
 using Microsoft.Owin.Security;
-using Microsoft.Owin.Security.DataHandler.Encoder;
 using Microsoft.Owin.Security.Infrastructure;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -20,9 +18,9 @@ namespace Owin.Security.Providers.Slack
     public class SlackAuthenticationHandler : AuthenticationHandler<SlackAuthenticationOptions>
     {
         // see https://api.slack.com/docs/oauth for docs 
-        private const string AuthorizeEndpoint = "https://slack.com/oauth/authorize";
-        private const string TokenEndpoint = "https://slack.com/api/oauth.access";
-        private const string UserInfoEndpoint = "https://slack.com/api/auth.test";
+        private const string AuthorizeEndpoint = "https://slack.com/oauth/v2/authorize";
+        private const string TokenEndpoint = "https://slack.com/api/oauth.v2.access";
+        private const string UserInfoEndpoint = "https://slack.com/api/users.info";
         private const string XmlSchemaString = "http://www.w3.org/2001/XMLSchema#string";
 
         private readonly HttpClient _httpClient;
@@ -88,43 +86,47 @@ namespace Owin.Security.Providers.Slack
                 body.Add(new KeyValuePair<string, string>("client_secret", Options.ClientSecret));
 
                 // Request the token
-                var tokenResponse =
-                    await _httpClient.PostAsync(TokenEndpoint, new FormUrlEncodedContent(body));
+                var tokenResponse = await _httpClient.PostAsync(TokenEndpoint, new FormUrlEncodedContent(body));
                 tokenResponse.EnsureSuccessStatusCode();
-                string text = await tokenResponse.Content.ReadAsStringAsync();
+                var content = await tokenResponse.Content.ReadAsStringAsync();
 
                 // Deserializes the token response
-                JObject response = JsonConvert.DeserializeObject<JObject>(text);
-                JObject bot = response.Value<JObject>("bot");
-                JObject incomingWebhook = response.Value<JObject>("incoming_webhook");
-                string accessToken = response.Value<string>("access_token");
+                var tokenJson = JsonConvert.DeserializeObject<JObject>(content);
+                var accessToken = tokenJson.Value<string>("access_token");
+                var authenticatedUser = tokenJson.Value<JObject>("authed_user");
+                var botUserId = tokenJson.Value<string>("bot_user_id");
+                var incomingWebhook = tokenJson.Value<JObject>("incoming_webhook");
+                var team = tokenJson.Value<JObject>("team");
 
                 // Build up the body for the user request
                 body = new List<KeyValuePair<string, string>>();
                 body.Add(new KeyValuePair<string, string>("token", accessToken));
+                body.Add(new KeyValuePair<string, string>("user", authenticatedUser?.Value<string>("id")));
 
                 // Get the Slack user
-                var userResponse =
-                    await _httpClient.PostAsync(UserInfoEndpoint, new FormUrlEncodedContent(body));
-                userResponse.EnsureSuccessStatusCode();
-                text = await userResponse.Content.ReadAsStringAsync();
-                JObject user = JObject.Parse(text);
+                JObject user = null;
+                var userResponse = await _httpClient.PostAsync(UserInfoEndpoint, new FormUrlEncodedContent(body));
+                if (userResponse.IsSuccessStatusCode) {
+                    var userContent = await userResponse.Content.ReadAsStringAsync();
+                    var userJson = JsonConvert.DeserializeObject<JObject>(userContent);
+                    user = tokenJson.Value<JObject>("user");
+                }
 
-                var context = new SlackAuthenticatedContext(Context, accessToken, user, bot, incomingWebhook);
+                var context = new SlackAuthenticatedContext(Context, accessToken, botUserId, authenticatedUser, incomingWebhook, team, user);
                 context.Identity = new ClaimsIdentity(
                     Options.AuthenticationType,
                     ClaimsIdentity.DefaultNameClaimType,
                     ClaimsIdentity.DefaultRoleClaimType);
 
-                if (!string.IsNullOrEmpty(context.UserId)) 
+                if (!string.IsNullOrEmpty(context.BotUserId ?? context.UserId)) 
                 {
                     context.Identity.AddClaim(
-                        new Claim(ClaimTypes.NameIdentifier, context.UserId, XmlSchemaString, Options.AuthenticationType));
+                        new Claim(ClaimTypes.NameIdentifier, context.BotUserId ?? context.UserId, XmlSchemaString, Options.AuthenticationType));
                 }
-                if (!string.IsNullOrEmpty(context.UserName)) 
+                if (!string.IsNullOrEmpty(context.BotUserId ?? context.UserName)) 
                 {
                     context.Identity.AddClaim(
-                        new Claim(ClaimsIdentity.DefaultNameClaimType, context.UserName, XmlSchemaString, Options.AuthenticationType));
+                        new Claim(ClaimsIdentity.DefaultNameClaimType, context.BotUserId ?? context.UserName, XmlSchemaString, Options.AuthenticationType));
                 }
                 if (!string.IsNullOrEmpty(context.TeamId)) 
                 {
@@ -133,10 +135,6 @@ namespace Owin.Security.Providers.Slack
                 if (!string.IsNullOrEmpty(context.TeamName)) 
                 {
                     context.Identity.AddClaim(new Claim("urn:slack:teamname", context.TeamName, XmlSchemaString, Options.AuthenticationType));
-                }
-                if (!string.IsNullOrEmpty(context.TeamUrl)) 
-                {
-                    context.Identity.AddClaim(new Claim(ClaimTypes.Webpage, context.TeamUrl, XmlSchemaString, Options.AuthenticationType));
                 }
                 context.Properties = properties;
 

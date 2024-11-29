@@ -1,7 +1,6 @@
 //  Copyright 2015 Stefan Negritoiu. See LICENSE file for more information.
 
 using System;
-using System.Globalization;
 using System.Security.Claims;
 using Microsoft.Owin;
 using Microsoft.Owin.Security;
@@ -21,32 +20,42 @@ namespace Owin.Security.Providers.Slack
         /// <param name="context">The OWIN environment</param>
         /// <param name="user">The JSON-serialized user</param>
         /// <param name="accessToken">Slack access token</param>
-        public SlackAuthenticatedContext(
-            IOwinContext context, string accessToken, JObject user, JObject bot, JObject incomingWebhook) 
+        public SlackAuthenticatedContext(IOwinContext context, 
+            string accessToken, string botUserId, JObject authenticatedUser, JObject incomingWebhook, JObject team, JObject user) 
             : base(context)
         {
             AccessToken = accessToken;
+            BotUserId = botUserId;
 
-            if (user != null) 
+            if (!string.IsNullOrEmpty(botUserId))
             {
-                TeamId = TryGetValue(user, "team_id");
-                TeamName = TryGetValue(user, "team");
-                UserId = TryGetValue(user, "user_id");
-                UserName = TryGetValue(user, "user");
-                TeamUrl = TryGetValue(user, "url");
+                BotAccessToken = accessToken;
             }
 
-            if (bot != null) 
+            if (authenticatedUser != null) 
             {
-                BotAccessToken = TryGetValue(bot, "bot_access_token");
-                BotUserId = TryGetValue(bot, "bot_user_id");
+                UserId = TryGetValue(authenticatedUser, "id");
             }
 
             if (incomingWebhook != null) 
             {
+                // docs at https://api.slack.com/messaging/webhooks#incoming_webhooks_programmatic
                 IncomingWebhookChannel = TryGetValue(incomingWebhook, "channel");
+                IncomingWebhookChannel = TryGetValue(incomingWebhook, "channel_id");
                 IncomingWebhookConfigUrl = TryGetValue(incomingWebhook, "configuration_url");
                 IncomingWebhookUrl = TryGetValue(incomingWebhook, "url");
+            }
+
+            if (team != null) 
+            {
+                TeamId = TryGetValue(team, "id");
+                TeamName = TryGetValue(team, "name");
+            }
+
+            if (user != null) 
+            {
+                UserId = TryGetValue(user, "id");
+                UserName = TryGetValue(user, "name");
             }
         }
 
@@ -64,11 +73,6 @@ namespace Owin.Security.Providers.Slack
         /// Gets the team name
         /// </summary>
         public string TeamName { get; private set; }
-
-        /// <summary>
-        /// Gets the team URL
-        /// </summary>
-        public string TeamUrl { get; private set; }
 
         /// <summary>
         /// Gets the user ID
@@ -115,20 +119,12 @@ namespace Owin.Security.Providers.Slack
         /// </summary>
         public string BotAccessToken { get; private set; }
 
-
-        /// <summary>
-        /// Gets the username
-        /// </summary>
         public string IncomingWebhookChannel { get; private set; }
 
-        /// <summary>
-        /// If requesting access for a bot gets the user ID for the bot user
-        /// </summary>
+        public string IncomingWebhookChannelId { get; private set; }
+
         public string IncomingWebhookConfigUrl { get; private set; }
 
-        /// <summary>
-        /// If requesting access for a bot gets the access token to be used by the bot
-        /// </summary>
         public string IncomingWebhookUrl { get; private set; }
 
         /// <summary>
